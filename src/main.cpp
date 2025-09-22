@@ -19,7 +19,10 @@ DHTesp dht;
 const char *WiFiSSID = SECRET_WIFI_SSID;
 const char *WiFiPass = SECRET_WIFI_PASS;
 
-const uint32_t sendPeriod = 1000;//How often a thing should be sent, and then the state machine advanced
+const uint32_t picturePeriod = 2000;
+const uint32_t weatherPeriod = 2000;
+const uint32_t logPeriod = 60000;
+
 const uint32_t howLongBeforeRestartIfNotConnecting = 300000;//restart esp32 if havent been able to connect to server for 5 minutes
 
 
@@ -54,7 +57,7 @@ void packetReceived(uint8_t* data, uint32_t dataLength){
 
 void onConnected(){
     Serial.println("NetClient Connected");
-    NetClient.sendString("i=Qual(8best-63worst):byte:1,FrameSize(3|5|7):byte:2");
+    NetClient.sendString("\xFF\x01Qual(8best-63worst):byte:1,FrameSize(3|5|7):byte:2");
 }
 
 void onDisconnected(){
@@ -150,7 +153,9 @@ void loop(){
     static uint32_t lastConnectTime=0;
     static uint8_t failReconnects=0;
 
-    static uint32_t lastSendTime=0;
+    static uint32_t lastPictureSendTime=0;
+    static uint32_t lastWeatherSendTime=0;
+    static uint32_t lastLogTime=0;
     static uint32_t lastReadyTime=0;
 
     uint32_t currentTime = millis();
@@ -170,26 +175,26 @@ void loop(){
         if (NetClient.loop()){
             lastReadyTime=currentTime;
 
-            if (isTimeToExecute(lastSendTime, sendPeriod)){
-                switch (sendState.state){
-                    case 0:                
-                        CAMERA_CAPTURE capture;
-                        if (cameraCapture(capture)){
-                            NetClient.sendBinary(capture.jpgBuff, capture.jpgBuffLen);
-                            cameraCaptureCleanup(capture);
-                        }else{
-                            Serial.println("failed to capture ");
-                        }
-                        break;
-                        
-                    case 1:
-                        float humidity = dht.getHumidity();
-                        float temperature = dht.getTemperature()*1.8f+32.0f;
-                        String weather=String("w=humidity:")+String(humidity, 1)+String(",temperature:")+String(temperature, 1);
-                        NetClient.sendString(weather);
-                        break;
+            if (isTimeToExecute(lastPictureSendTime, picturePeriod)){
+                CAMERA_CAPTURE capture;
+                if (cameraCapture(capture)){
+                    NetClient.sendBinary(capture.jpgBuff, capture.jpgBuffLen);
+                    cameraCaptureCleanup(capture);
+                }else{
+                    Serial.println("failed to capture ");
                 }
-                sendState.next();
+            }
+            if (isTimeToExecute(lastWeatherSendTime, weatherPeriod)){
+                float humidity = dht.getHumidity();
+                float temperature = dht.getTemperature()*1.8f+32.0f;
+                NetClient.sendString(String("humidity=")+String(humidity, 1));
+                NetClient.sendString(String("temperature=")+String(temperature, 1));
+                Serial.println(String("humidity=")+String(humidity, 1));
+                Serial.println(String("temperature=")+String(temperature, 1));
+            }
+            if (isTimeToExecute(lastLogTime, logPeriod)){
+                NetClient.sendString("log");
+                Serial.println("Logging");
             }
         }
     }
