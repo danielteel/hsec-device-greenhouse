@@ -23,6 +23,7 @@ const uint32_t picturePeriod = 2000;
 const uint32_t weatherPeriod = 2000;
 const uint32_t logPeriod = 60000;
 
+
 const uint32_t howLongBeforeRestartIfNotConnecting = 300000;//restart esp32 if havent been able to connect to server for 5 minutes
 
 
@@ -57,7 +58,6 @@ void packetReceived(uint8_t* data, uint32_t dataLength){
 
 void onConnected(){
     Serial.println("NetClient Connected");
-    NetClient.sendString("\xFF\x01Qual(8best-63worst):byte:1,FrameSize(3|5|7):byte:2");
 }
 
 void onDisconnected(){
@@ -128,28 +128,7 @@ void setup(){
     NetClient.setOnDisconnected(&onDisconnected);
 }
 
-
-class StateMachine {
-    public:
-        StateMachine(uint8_t max){
-            maxStates=max;
-        }
-
-        uint8_t maxStates=0;
-        uint8_t state=0;
-
-
-        void next(){
-            state++;
-            if (state>=maxStates){
-                state=0;
-            }
-        }
-};
-
 void loop(){
-    static StateMachine sendState(2);
-
     static uint32_t lastConnectTime=0;
     static uint8_t failReconnects=0;
 
